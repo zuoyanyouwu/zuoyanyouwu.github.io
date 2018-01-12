@@ -1,0 +1,68 @@
+<!DOCTYPE html><html lang="en"><head><meta http-equiv="content-type" content="text/html; charset=utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="description"><title>HDFS 读写过程分析 | 左言右午的日常</title><link rel="stylesheet" type="text/css" href="/css/style.css?v=0.0.0"><link rel="stylesheet" type="text/css" href="//cdn.bootcss.com/normalize/7.0.0/normalize.min.css"><link rel="stylesheet" type="text/css" href="//cdn.bootcss.com/pure/1.0.0/pure-min.css"><link rel="stylesheet" type="text/css" href="//cdn.bootcss.com/pure/1.0.0/grids-responsive-min.css"><link rel="stylesheet" href="//cdn.bootcss.com/font-awesome/4.7.0/css/font-awesome.min.css"><script type="text/javascript" src="//cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script><link rel="Shortcut Icon" type="image/x-icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="apple-touch-icon-precomposed" href="/apple-touch-icon.png"><link rel="alternate" type="application/atom+xml" href="/atom.xml"></head><body><div class="body_container"><div id="header"><div class="site-name"><h1 class="hidden">HDFS 读写过程分析</h1><a id="logo" href="/.">左言右午的日常</a><p class="description">会写一点程序;</p></div><div id="nav-menu"><a class="current" href="/."><i class="fa fa-home"> Home</i></a><a href="/archives/"><i class="fa fa-archive"> Archive</i></a><a href="/about/"><i class="fa fa-user"> About</i></a><a href="/atom.xml"><i class="fa fa-rss"> RSS</i></a></div></div><div class="pure-g" id="layout"><div class="pure-u-1 pure-u-md-3-4"><div class="content_container"><div class="post"><h1 class="post-title">HDFS 读写过程分析</h1><div class="post-meta">Oct 23, 2017<span> | </span><span class="category"><a href="/categories/Technology/">Technology</a></span></div><div class="post-content"><p>HDFS 是一个分布式文件系统，它和现有的分布式文件系统有很多共同点。但同时，它和其他的分布式文件系统的区别也是很明显的。HDFS是一个高度容错性的系统，适合部署在廉价的机器上。HDFS能提供高吞吐量的数据访问，非常适合大规模数据集上的应用。HDFS 上读写文件的过程与我们平时使用的单机文件系统非常不同，本文就介绍 HDFS 上读写文件过程。</p>
+<h3 id="一、写文件过程"><a href="#一、写文件过程" class="headerlink" title="一、写文件过程"></a>一、写文件过程</h3><p>在 HDFS 文件系统上创建并写一个文件，流程如下图所示：</p>
+<p><img src="/images/hdfs-write-flow.png" alt="hdfs-write-flow"></p>
+<p>具体过程描述如下：</p>
+<ol>
+<li>Client 调用 DistributedFileSystem 对象的 create 方法，创建一个文件输出流（FSDataOutputStream）对象</li>
+<li>通过 DistributedFileSystem 对象与 Hadoop 集群的 NameNode 进行一次RPC远程调用，在HDFS的 Namespace 中创建一个文件条目（Entry），该条目没有任何的 Block</li>
+<li>通过 FSDataOutputStream 对象，向 DataNode 写入数据，数据首先被写入 FSDataOutputStream 对象内部的 Buffer 中，然后数据被分割成一个个 Packet 数据包</li>
+<li>以Packet最小单位，基于 Socket 连接发送到按特定算法选择的 HDFS 集群中一组 DataNode（正常是3个，可能大于等于1）中的一个节点上，在这组 DataNode 组成的 Pipeline 上依次传输 Packet</li>
+<li>这组 DataNode 组成的 Pipeline 反方向上，发送 ack ，最终由 Pipeline 中第一个 DataNode 节点将 Pipeline  ack 发送给 Client</li>
+<li>完成向文件写入数据，Client 在文件输出流（FSDataOutputStream）对象上调用 close 方法，关闭流</li>
+<li>调用 DistributedFileSystem 对象的 complete 方法，通知 NameNode 文件写入成功</li>
+</ol>
+<h4 id="Packet结构与定义"><a href="#Packet结构与定义" class="headerlink" title="Packet结构与定义"></a>Packet结构与定义</h4><p>Client 向 HDFS 写数据，数据会被组装成 Packet，然后发送到 Datanode 节点。Packet 分为两类，一类是实际数据包，另一类是 heatbeat 包。</p>
+<p>packet 相关参数如下：</p>
+<table>
+<thead>
+<tr>
+<th><strong>参数名称</strong></th>
+<th><strong>参数值</strong></th>
+<th><strong>参数含义</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>chunkSize</td>
+<td>512+4=516</td>
+<td>每个chunk的字节数（数据+校验和）</td>
+</tr>
+<tr>
+<td>csize</td>
+<td>512</td>
+<td>每个chunk数据的字节数</td>
+</tr>
+<tr>
+<td>psize</td>
+<td>64*1024</td>
+<td>每个packet的最大字节数（不包含header）</td>
+</tr>
+<tr>
+<td>DataNode.PKT_HEADER_LEN</td>
+<td>21</td>
+<td>每个packet的header的字节数</td>
+</tr>
+<tr>
+<td>chunksPerPacket</td>
+<td>127</td>
+<td>组成每个packet的chunk的个数</td>
+</tr>
+<tr>
+<td>packetSize</td>
+<td>25+516*127=65557</td>
+<td>每个packet的字节数（一个header+一组chunk）</td>
+</tr>
+</tbody>
+</table>
+<p>Packet数据包的组成结构，如图所示：</p>
+<p><img src="/images/hdfs-write-packet-structure.png" alt="hdfs-packet-structure"></p>
+<h3 id="二、读文件过程"><a href="#二、读文件过程" class="headerlink" title="二、读文件过程"></a>二、读文件过程</h3><p>在 HDFS 文件系统上读取一个文件，流程如下图所示：</p>
+<p><img src="/images/hdfs-read-flow.png" alt="hdfs-read-flow"></p>
+<ol>
+<li>Client 调用 DistributedFileSystem 对象的 open 方法，创建一个文件输入流（FSDataInputStream）对象</li>
+<li>通过 DistributedFileSystem 对象与 Hadoop 集群的 NameNode 进行一次RPC远程调用，确定需要打开的文件一批数据块的存储位置</li>
+<li>通过 FSDataInputStream 对象，读取距离客户端最近的 datanode，该 datanode 读取完成后接着寻找下一个 datanode 节点并读取数据</li>
+<li>继续询问 namenode 下一批数据块的 datanode 的位置</li>
+<li>读取完成后调用 FSDataInputStream 的 close 方法结束整个流程</li>
+</ol>
+</div><div class="tags"><a href="/tags/HDFS/">HDFS</a><a href="/tags/Hadoop/">Hadoop</a></div><div class="post-nav"><a class="pre" href="/2017/10/netty-data-flow-optimize/">时空域联合约束技术在 Netty 中的应用</a><a class="next" href="/2017/08/fastdfs-deployment/">fastDFS 部署</a></div></div></div></div><div class="pure-u-1-4 hidden_mid_and_down"><div id="sidebar"><div class="widget"><form class="search-form" action="//www.google.com/search" method="get" accept-charset="utf-8" target="_blank"><input type="text" name="q" maxlength="20" placeholder="Search"/><input type="hidden" name="sitesearch" value="http://zuoyanyouwu.com"/></form></div><div class="widget"><div class="widget-title"><i class="fa fa-folder-o"> Categories</i></div><ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Life/">Life</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/Technology/">Technology</a></li></ul></div><div class="widget"><div class="widget-title"><i class="fa fa-star-o"> Tags</i></div><div class="tagcloud"><a href="/tags/FIR/" style="font-size: 15px;">FIR</a> <a href="/tags/Android/" style="font-size: 15px;">Android</a> <a href="/tags/Message/" style="font-size: 15px;">Message</a> <a href="/tags/Looper/" style="font-size: 15px;">Looper</a> <a href="/tags/Chrome/" style="font-size: 15px;">Chrome</a> <a href="/tags/WebView/" style="font-size: 15px;">WebView</a> <a href="/tags/Netty/" style="font-size: 15px;">Netty</a> <a href="/tags/Java/" style="font-size: 15px;">Java</a> <a href="/tags/JUnit/" style="font-size: 15px;">JUnit</a> <a href="/tags/Activity/" style="font-size: 15px;">Activity</a> <a href="/tags/jekyll/" style="font-size: 15px;">jekyll</a> <a href="/tags/GithubPages/" style="font-size: 15px;">GithubPages</a> <a href="/tags/Handler/" style="font-size: 15px;">Handler</a> <a href="/tags/和时间有关的故事/" style="font-size: 15px;">和时间有关的故事</a> <a href="/tags/RecyclerView/" style="font-size: 15px;">RecyclerView</a> <a href="/tags/Photos/" style="font-size: 15px;">Photos</a> <a href="/tags/ViewPager/" style="font-size: 15px;">ViewPager</a> <a href="/tags/Life/" style="font-size: 15px;">Life</a> <a href="/tags/HTTP/" style="font-size: 15px;">HTTP</a> <a href="/tags/HTTPS/" style="font-size: 15px;">HTTPS</a> <a href="/tags/SSL-TLS/" style="font-size: 15px;">SSL/TLS</a> <a href="/tags/fastDFS/" style="font-size: 15px;">fastDFS</a> <a href="/tags/HDFS/" style="font-size: 15px;">HDFS</a> <a href="/tags/Hadoop/" style="font-size: 15px;">Hadoop</a> <a href="/tags/时空域/" style="font-size: 15px;">时空域</a></div></div><div class="widget"><div class="widget-title"><i class="fa fa-file-o"> Recent</i></div><ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2017/10/netty-data-flow-optimize/">时空域联合约束技术在 Netty 中的应用</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/10/hdfs-write-read-flow/">HDFS 读写过程分析</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/08/fastdfs-deployment/">fastDFS 部署</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/08/fastdfs-introduct/">fastDFS 介绍</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/intro-about-http-protocol/">HTTP 协议简介</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/01/netty-ssl-using-and-analyze/">Netty SSL/TLS 的使用与分析</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/01/netty-http-form-data/">Netty HTTP form-data 编码简析</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/01/my-2016/">2016 - 总结</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/12/netty-handler-tester/">Netty Handler 单元测试</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/chrome-custom-tabs/">Chrome Custom Tabs --- 更好的展示网页</a></li></ul></div><div class="widget"><div class="widget-title"><i class="fa fa-external-link"> Links</i></div><ul></ul><a href="http://maikoushuo.com/" title="麦口说" target="_blank">麦口说</a></div></div></div><div class="pure-u-1 pure-u-md-3-4"><div id="footer">Copyright © 2018 <a href="/." rel="nofollow">左言右午的日常.</a> Powered by<a rel="nofollow" target="_blank" href="https://hexo.io"> Hexo.</a><a rel="nofollow" target="_blank" href="https://github.com/tufu9441/maupassant-hexo"> Theme</a> by<a rel="nofollow" target="_blank" href="https://github.com/pagecho"> Cho.</a></div></div></div><a class="show" id="rocket" href="#top"></a><script type="text/javascript" src="/js/totop.js?v=0.0.0" async></script><script type="text/javascript" src="//cdn.bootcss.com/fancybox/3.2.5/jquery.fancybox.min.js" async></script><script type="text/javascript" src="/js/fancybox.js?v=0.0.0" async></script><link rel="stylesheet" type="text/css" href="//cdn.bootcss.com/fancybox/3.2.5/jquery.fancybox.min.css"><script type="text/javascript" src="/js/codeblock-resizer.js?v=0.0.0"></script><script type="text/javascript" src="/js/smartresize.js?v=0.0.0"></script></div></body></html>
