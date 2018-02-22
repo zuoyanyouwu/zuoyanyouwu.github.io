@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://zuoyanyouwu.com/"/>
-  <updated>2018-01-12T09:08:20.000Z</updated>
+  <updated>2018-02-22T07:51:13.000Z</updated>
   <id>http://zuoyanyouwu.com/</id>
   
   <author>
@@ -15,6 +15,28 @@
   </author>
   
   <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>2017 - 总结</title>
+    <link href="http://zuoyanyouwu.com/2018/02/my-2017/"/>
+    <id>http://zuoyanyouwu.com/2018/02/my-2017/</id>
+    <published>2018-02-14T05:14:21.000Z</published>
+    <updated>2018-02-22T07:51:13.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>2017 年经历了太多，像过山车一样，工作、生活发生了很大变化。</p><h3 id="工作"><a href="#工作" class="headerlink" title="工作"></a>工作</h3><p>公司业务拓展，增加了几条产品线，我负责其中的「文件安全产品线」，主要针对云上对象存储的安全代理，承担的工作也比之前多，不只是研发管理，还要产品设计，好在有很棒的同事协助，产品做的也比较顺手。</p><p>11 月份公司因为某些原因难以维持，便离职加入了端点网络科技，从事供采产品线研发。不到三个月时间，学习到了很多后端的技术，希望今年可以弥补自己业务上的短板。</p><h3 id="生活"><a href="#生活" class="headerlink" title="生活"></a>生活</h3><p>年初认识了我老婆，并顺利领证，前几天也完美的举办了婚礼，非常感谢老婆的好脾气以及对我的包容和支持。</p><p>买房了，生活压力也大了，接下来希望今年可以顺利收房。</p><h3 id="技术"><a href="#技术" class="headerlink" title="技术"></a>技术</h3><p>技术方向主要放在了后端上，Netty 的应用及底层原理也更加了解，并根据 Netty 的特性完成了公司多个项目的性能优化(参见<a href="http://www.zuoyanyouwu.com/2017/10/netty-data-flow-optimize/" target="_blank" rel="noopener">时空域联合约束技术在 Netty 中的应用</a>)。</p><p>加入新公司后，学习了 SpringBoot、Dubbo、Docker、ElasticSearch、分布式技术的应用，丰富了后端技术，下一步需要更了解技术原理，同时拓展技术栈，学习 Kotlin 以及前端(如 Vue 等)。</p><p>Golang 也要继续学习，希望可以在项目中应用上。</p><p>「高性能MySQL 」继续阅读、学习。</p><p>断断续续写了几篇博客。</p><h3 id="2018-年计划"><a href="#2018-年计划" class="headerlink" title="2018 年计划"></a>2018 年计划</h3><p>加入新公司后，很少有时间去健身了，希望可以利用空余时间健身，保持身体健康。</p><p>多学习一些框架的设计理念和原理，技术上要有更多的收获，继续写博客。</p><p>住进新房。</p>]]></content>
+    
+    <summary type="html">
+    
+      总结下已经过去的 2017。
+    
+    </summary>
+    
+      <category term="Life" scheme="http://zuoyanyouwu.com/categories/Life/"/>
+    
+    
+      <category term="Life" scheme="http://zuoyanyouwu.com/tags/Life/"/>
+    
+  </entry>
   
   <entry>
     <title>时空域联合约束技术在 Netty 中的应用</title>
